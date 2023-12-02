@@ -1,0 +1,76 @@
+---
+title: "p8105_hw6_jw4489"
+output: github_document
+date: "2023-12-02"
+---
+
+```{r}
+library(tidyverse)
+library(purrr)
+library(modelr)
+library(dplyr)
+library(broom)
+```
+
+## Problem 1
+
+```{r}
+homicide = read.csv("hw6data/homicide-data.csv")
+view(homicide)
+```
+
+##### Load and clean data
+
+```{r}
+df1 = homicide |>
+  janitor::clean_names() |> 
+  mutate(city_state = paste(city, state, sep = ", ")) |>
+  mutate(solved = ifelse(disposition == "Closed by arrest", 1, 0)) |>
+  filter(!(city %in% c("Dallas", "Phoenix", "Kansas City", "Tulsa"))) |>
+  filter(victim_race == "White" | victim_race == "Black") |>
+  mutate(victim_age = as.numeric(victim_age))
+
+view(df1)  
+```
+
+##### Baltimore model
+
+```{r}
+baltimore_df = df1 |>
+   filter(city_state == "Baltimore, MD")
+```
+
+```{r}
+baltimore_model = glm(disposition == "Closed by arrest" ~ victim_age + victim_sex + victim_race, 
+                      data = baltimore_df, family = binomial)
+```
+
+```{r}
+baltimore_results = baltimore_model |>
+  broom::tidy() 
+
+```
+
+##### Each city
+
+```{r}
+
+```
+
+
+## Problem 2
+
+```{r}
+weather_df = 
+  rnoaa::meteo_pull_monitors(
+    c("USW00094728"),
+    var = c("PRCP", "TMIN", "TMAX"), 
+    date_min = "2022-01-01",
+    date_max = "2022-12-31") |>
+  mutate(
+    name = recode(id, USW00094728 = "CentralPark_NY"),
+    tmin = tmin / 10,
+    tmax = tmax / 10) |>
+  select(name, id, everything())
+```
+
