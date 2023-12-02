@@ -10,6 +10,11 @@ library(purrr)
 library(modelr)
 library(dplyr)
 library(broom)
+library(ggplot2)
+```
+
+```{r setup, include=FALSE} 
+knitr::opts_chunk$set(warning = FALSE)
 ```
 
 ## Problem 1
@@ -109,7 +114,82 @@ weather_df =
   select(name, id, everything())
 ```
 
-```{r}
+##### Bootstrap function
 
+```{r}
+bootstrap_regression = function(data) {
+  boot_sample = sample_n(data, nrow(data), replace = TRUE)
+  model = lm(tmax ~ tmin + prcp, data = boot_sample)
+  r_squared = broom::glance(model)$r.squared
+  coefficients = broom::tidy(model) |>
+    filter(term %in% c("tmin", "prcp")) |>
+    summarise(log_beta_product = log(prod(estimate)))
+  
+  return(c(r_squared, coefficients))
+}
 ```
+
+##### Estimates of 5000 samples
+
+```{r}
+bootstrap_results <- data.frame(
+  r_squared = numeric(5000),
+  log_beta_product = numeric(5000)
+)
+
+set.seed(1) 
+for (i in 1 : 5000) {
+  bootstrap_results[i, ] <- bootstrap_regression(weather_df)
+}
+```
+
+##### Visualizations
+
+```{r}
+ggplot(bootstrap_results, aes(x = r_squared)) +
+  geom_histogram() +
+  labs(x = "Bootstrap Estimates of r^2", y = "Frequency")
+
+ggplot(bootstrap_results, aes(x = log_beta_product)) +
+  geom_histogram() +
+  labs(x = "Bootstrap Estimates of log(β1*β2)", y = "Frequency")
+```
+
+##### Confidence Interval
+
+```{r}
+quantile_0.025_1 = bootstrap_results |>
+  pull(r_squared)|>
+  quantile(0.025)
+
+quantile_0.975_1 = bootstrap_results |>
+  pull(r_squared)|>
+  quantile(0.975)
+
+quantile_0.025_1
+quantile_0.975_1
+```
+
+According to the results above, the 95% confidence interval for r_squared is (`r quantile_0.025_1`, `r quantile_0.975_1`).
+
+```{r}
+quantile_0.025_2 = bootstrap_results |>
+  pull(log_beta_product)|>
+  na.omit()|>
+  quantile(0.025)
+
+quantile_0.975_2 = bootstrap_results |>
+  pull(log_beta_product)|>
+  na.omit()|>
+  quantile(0.975)
+
+quantile_0.025_2
+quantile_0.975_2
+```
+
+According to the results above, the 95% confidence interval for og(β̂ 0∗β̂ 1) is (`r quantile_0.025_2`, `r quantile_0.975_2`).
+
+
+
+
 
