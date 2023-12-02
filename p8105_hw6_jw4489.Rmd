@@ -4,7 +4,7 @@ output: github_document
 date: "2023-12-02"
 ---
 
-```{r}
+```{r, message = FALSE}
 library(tidyverse)
 library(purrr)
 library(modelr)
@@ -36,29 +36,64 @@ view(df1)
 ##### Baltimore model
 
 ```{r}
-baltimore_df = df1 |>
+baltimore_df = na.omit(df1) |>
    filter(city_state == "Baltimore, MD")
 ```
 
 ```{r}
-baltimore_model = glm(disposition == "Closed by arrest" ~ victim_age + victim_sex + victim_race, 
+baltimore_model = 
+  glm(disposition == "Closed by arrest" ~ victim_age + victim_sex + victim_race, 
                       data = baltimore_df, family = binomial)
 ```
 
 ```{r}
 baltimore_results = baltimore_model |>
-  broom::tidy() 
+  broom::tidy() |>
+  filter(term == "victim_sexMale") |>
+  mutate(estimate_or = exp(estimate), 
+         CI_lower = exp(estimate - 1.96 * std.error),
+         CI_upper = exp(estimate + 1.96 * std.error)) |>
+  knitr::kable()      
 
+baltimore_results
 ```
 
 ##### Each city
 
 ```{r}
+city_results = df1 |>
+  nest(data = -city_state) |>
+  mutate(models = map(data, \(df) glm(solved ~ victim_age + victim_sex + victim_race, data = df, family = binomial())),
+         results = map(models, broom::tidy)) |> 
+  select(-models) |> 
+  unnest(results) |>
+  filter(term == "victim_sexMale") |>
+  mutate(estimate_or = exp(estimate),
+         CI_lower = exp(estimate - 1.96 * std.error),
+         CI_upper = exp(estimate + 1.96 * std.error)) |>
+  select(city_state, term, estimate_or, CI_lower, CI_upper)
 
+city_results
+```
+  
+##### Plots
+
+```{r}
+results_plot = city_results |>
+  mutate(city_state = fct_reorder(city_state, estimate_or)) |> 
+  ggplot(aes(x = city_state,y = estimate_or)) + 
+  geom_point(size = 3) + 
+  geom_errorbar(aes(ymin = CI_lower,ymax = CI_upper)) + 
+  labs(x = "City", y = "Adjusted Odds Ratio (Male vs. Female)",
+       title = "Adjusted Odds Ratios for Solving Homicides (Male vs. Female) by City") +
+  theme(axis.text.x = element_text(size = 5, angle = 45, hjust = 1))
+
+results_plot
 ```
 
-
 ## Problem 2
+
+##### Load data
 
 ```{r}
 weather_df = 
@@ -72,5 +107,9 @@ weather_df =
     tmin = tmin / 10,
     tmax = tmax / 10) |>
   select(name, id, everything())
+```
+
+```{r}
+
 ```
 
